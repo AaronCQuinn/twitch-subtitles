@@ -11,26 +11,31 @@ let recorder;
 
 // runs real-time transcription and handles global variables
 const run = async () => {
-  if (isRecording) { 
-    if (socket) {
+  if (isRecording) { // If the function is run and it is already recording.
+
+    // If socket is true, send a JSON object to terminate session, close the socket, set it null.
+    if (socket) { 
       socket.send(JSON.stringify({terminate_session: true}));
       socket.close();
       socket = null;
     }
 
+    // If recorder is true when function is invoked, pause the recording, set it to null.
     if (recorder) {
       recorder.pauseRecording();
       recorder = null;
     }
+
+    // If the function is invoked under normal circumstances (it isn't already running).
   } else {
     const response = await fetch('http://localhost:8000'); // get temp session token from server.js (backend)
-    const data = await response.json();
+    const data = await response.json(); // Await a session token from the backend.
 
-    if(data.error){
-      alert(data.error)
+    if (data.error) { // Alert if there's an error with getting the token.
+      alert(data.error);
     }
     
-    const { token } = data;
+    const { token } = data; // Deconstruct the token from the response.
 
     // establish wss with AssemblyAI (AAI) at 16000 sample rate
     socket = await new WebSocket(`wss://api.assemblyai.com/v2/realtime/ws?sample_rate=16000&token=${token}`);
@@ -38,9 +43,13 @@ const run = async () => {
     // handle incoming messages to display transcription to the DOM
     const texts = {};
     socket.onmessage = (message) => {
-      let msg = '';
-      const res = JSON.parse(message.data);
-      texts[res.audio_start] = res.text;
+      let msg = ''; // Empty msg.
+      const res = JSON.parse(message.data); // Response from socket.
+
+      // Add key to texts object called 'res.audio_start', with the value of the sentence from response.
+      texts[res.audio_start] = res.text; 
+      
+      // Order the messages in the div in chronological order.
       const keys = Object.keys(texts);
       keys.sort((a, b) => a - b);
       for (const key of keys) {
@@ -51,20 +60,21 @@ const run = async () => {
       messageEl.innerText = msg;
     };
 
+    // If there's an error on the socket, log it and close the socket.
     socket.onerror = (event) => {
       console.error(event);
       socket.close();
     }
     
+    // Close the socket, set it null.
     socket.onclose = event => {
       console.log(event);
       socket = null;
     }
 
     socket.onopen = () => {
-      // once socket is open, begin recording
-      messageEl.style.display = '';
-      navigator.mediaDevices.getUserMedia({ audio: true })
+      messageEl.style.display = ''; // On socket opening, clear the div.
+      navigator.mediaDevices.getUserMedia({ audio: true }) // Prompt the media device.
         .then((stream) => {
           recorder = new RecordRTC(stream, {
             type: 'audio',
